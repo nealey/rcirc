@@ -346,9 +346,6 @@ It should take the same arguments as `open-network-stream' does."
   "List of urls seen in the current buffer.")
 (put 'rcirc-urls 'permanent-local t)
 
-(defvar rcirc-timeout-seconds 600
-  "Kill connection after this many seconds if there is no activity.")
-
 (defconst rcirc-id-string (concat "rcirc on GNU Emacs " emacs-version))
 
 (defvar rcirc-startup-channels nil)
@@ -448,11 +445,9 @@ If ARG is non-nil, instead prompt for connection parameters."
 
 (defvar rcirc-process-output nil)
 (defvar rcirc-topic nil)
-(defvar rcirc-keepalive-timer nil)
 (defvar rcirc-last-server-message-time nil)
 (defvar rcirc-server nil)		; server provided by server
 (defvar rcirc-server-name nil)		; server name given by 001 response
-(defvar rcirc-timeout-timer nil)
 (defvar rcirc-user-disconnect nil)
 (defvar rcirc-connecting nil)
 (defvar rcirc-process nil)
@@ -500,8 +495,6 @@ If ARG is non-nil, instead prompt for connection parameters."
       (setq rcirc-startup-channels startup-channels)
       (make-local-variable 'rcirc-last-server-message-time)
       (setq rcirc-last-server-message-time (current-time))
-      (make-local-variable 'rcirc-timeout-timer)
-      (setq rcirc-timeout-timer nil)
       (make-local-variable 'rcirc-user-disconnect)
       (setq rcirc-user-disconnect nil)
       (make-local-variable 'rcirc-connecting)
@@ -516,10 +509,6 @@ If ARG is non-nil, instead prompt for connection parameters."
       (rcirc-send-string process (concat "USER " user-name
                                          " 0 * :" full-name))
 
-      ;; setup ping timer if necessary
-      (unless rcirc-keepalive-timer
-	(setq rcirc-keepalive-timer
-	      (run-at-time 0 (/ rcirc-timeout-seconds 2) 'rcirc-keepalive)))
 
       (message "Connecting to %s...done" server)
 
@@ -551,10 +540,7 @@ last ping."
                                                  (time-to-seconds
                                                   (current-time))
                                                (float-time)))))))
-            (rcirc-process-list))
-    ;; no processes, clean up timer
-    (cancel-timer rcirc-keepalive-timer)
-    (setq rcirc-keepalive-timer nil)))
+            (rcirc-process-list))))
 
 (defun rcirc-handler-ctcp-KEEPALIVE (process target sender message)
   (with-rcirc-process-buffer process
@@ -623,7 +609,6 @@ Function is called with PROCESS, COMMAND, SENDER, ARGS and LINE.")
 (defun rcirc-filter (process output)
   "Called when PROCESS receives OUTPUT."
   (rcirc-debug process output)
-  (rcirc-reschedule-timeout process)
   (with-rcirc-process-buffer process
     (setq rcirc-last-server-message-time (current-time))
     (setq rcirc-process-output (concat rcirc-process-output output))
@@ -633,18 +618,6 @@ Function is called with PROCESS, COMMAND, SENDER, ARGS and LINE.")
               (rcirc-process-server-response process line))
             (split-string rcirc-process-output "[\n\r]" t))
       (setq rcirc-process-output nil))))
-
-(defun rcirc-reschedule-timeout (process)
-  (with-rcirc-process-buffer process
-    (when (not rcirc-connecting)
-      (with-rcirc-process-buffer process
-	(when rcirc-timeout-timer (cancel-timer rcirc-timeout-timer))
-	(setq rcirc-timeout-timer (run-at-time rcirc-timeout-seconds nil
-					       'rcirc-delete-process
-					       process))))))
-
-(defun rcirc-delete-process (process)
-  (delete-process process))
 
 (defvar rcirc-trap-errors-flag t)
 (defun rcirc-process-server-response (process text)
@@ -2376,7 +2349,6 @@ keywords when no KEYWORD is given."
   (rcirc-handler-generic process "001" sender args text)
   (with-rcirc-process-buffer process
     (setq rcirc-connecting nil)
-    (rcirc-reschedule-timeout process)
     (setq rcirc-server-name sender)
     (setq rcirc-nick (car args))
     (rcirc-update-prompt)

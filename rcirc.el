@@ -542,14 +542,6 @@ last ping."
                                                (float-time)))))))
             (rcirc-process-list))))
 
-(defun rcirc-handler-ctcp-KEEPALIVE (process target sender message)
-  (with-rcirc-process-buffer process
-    (setq header-line-format (format "%f" (- (if (featurep 'xemacs)
-                                                 (time-to-seconds
-                                                  (current-time))
-                                               (float-time))
-					     (string-to-number message))))))
-
 (defvar rcirc-debug-buffer " *rcirc debug*")
 (defvar rcirc-debug-flag nil
   "If non-nil, write information to `rcirc-debug-buffer'.")
@@ -2616,7 +2608,6 @@ Passwords are stored in `rcirc-authinfo-file'."
         (when (and (or (not port) (equal port "irc"))
                    (and machine (string-match machine rcirc-server))
                    (or (not nick) (string-match nick rcirc-nick)))
-          (message "We have a match!")
           (cond ((equal account "bitlbee")
                  (rcirc-send-string
                   process

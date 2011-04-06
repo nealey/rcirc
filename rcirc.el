@@ -430,10 +430,11 @@ If ARG is non-nil, instead prompt for connection parameters."
                                      connect-function)
 		    (quit (message "Quit connecting to %s" server)))
 		(with-current-buffer (process-buffer connected)
+		  (if (process-contact (get-buffer-process
+					(current-buffer)) :host)
 		  (setq connected-servers
-			(cons (process-contact (get-buffer-process
-						(current-buffer)) :host)
-			      connected-servers))))))))
+			(cons (process-name connected)
+			      connected-servers)))))))))
       (when connected-servers
 	(message "Already connected to %s"
 		 (if (cdr connected-servers)
